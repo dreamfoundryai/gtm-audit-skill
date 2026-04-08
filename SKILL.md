@@ -305,6 +305,20 @@ Load on-demand as needed — do NOT load all at startup.
 
 - `scripts/fetch_gtm.py` — GTM API v2 data fetcher (OAuth 2.0, outputs JSON)
 - `scripts/requirements.txt` — Python dependencies
+- `install.sh` — One-command installer (clones repo, creates venv, installs deps)
+
+**Always invoke the fetcher via the bundled virtualenv** so it works regardless of
+the user's system Python state:
+
+```bash
+~/.claude/skills/gtm/.venv/bin/python ~/.claude/skills/gtm/scripts/fetch_gtm.py [args]
+```
+
+If `~/.claude/skills/gtm/.venv` does not exist, instruct the user to run:
+
+```bash
+bash ~/.claude/skills/gtm/install.sh
+```
 
 ## Dependencies
 
@@ -312,3 +326,5 @@ Python 3.9+ with:
 - `google-api-python-client` — GTM API v2 client
 - `google-auth-httplib2` — HTTP transport
 - `google-auth-oauthlib` — OAuth 2.0 flow
+
+All installed automatically into `~/.claude/skills/gtm/.venv` by `install.sh`.

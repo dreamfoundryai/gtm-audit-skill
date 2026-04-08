@@ -17,17 +17,29 @@ End-to-end workflow:
 
 ## Installation
 
-Clone into your Claude Code skills directory:
+One command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dreamfoundryai/gtm-audit-skill/main/install.sh | bash
+```
+
+This will:
+1. Clone the skill into `~/.claude/skills/gtm`
+2. Create an isolated Python virtualenv at `~/.claude/skills/gtm/.venv`
+3. Install all Python dependencies into that venv (no system Python pollution)
+4. Verify the install
+
+To update later, just run the same command again — it will pull the latest and reinstall deps.
+
+<details>
+<summary>Manual install</summary>
 
 ```bash
 git clone https://github.com/dreamfoundryai/gtm-audit-skill.git ~/.claude/skills/gtm
+bash ~/.claude/skills/gtm/install.sh
 ```
 
-Install Python dependencies:
-
-```bash
-pip install -r ~/.claude/skills/gtm/scripts/requirements.txt
-```
+</details>
 
 ## Setup (first time)
 
