@@ -35,7 +35,7 @@ SETUP INSTRUCTIONS (include in every test brief):
 
 ## Data Sources
 
-Read these JSON files from `/tmp/gtm-audit/` or the project's `backups/` directory:
+Read these JSON files from `./gtm/data/` (project-relative, written by `fetch_gtm.py`):
 
 | File | Contains | Key Fields |
 |------|----------|------------|

@@ -6,13 +6,20 @@ Connects to Google Tag Manager API v2 and exports container configuration
 (tags, triggers, variables) as JSON files for audit analysis.
 
 Usage:
-    python fetch_gtm.py --auth-only          # Just authenticate and verify
-    python fetch_gtm.py                       # Interactive: pick account/container
+    python fetch_gtm.py --auth-only                         # Just authenticate and verify
+    python fetch_gtm.py                                      # Interactive: pick account/container
     python fetch_gtm.py --account-id 123 --container-id 456
     python fetch_gtm.py --container-path "accounts/123/containers/456"
+    python fetch_gtm.py --output-dir ./gtm/data              # Override output directory
+
+Output:
+    By default, writes JSON files to ./gtm/data/ (relative to current working
+    directory). This is the per-project convention for the GTM skill.
+    Override with --output-dir or the GTM_OUTPUT_DIR env var.
 """
 
 import argparse
+import os
 import json
 import os
 import sys
@@ -29,7 +36,7 @@ SCOPES = ["https://www.googleapis.com/auth/tagmanager.readonly"]
 CREDENTIALS_DIR = Path.home() / ".config" / "gtm-audit"
 CREDENTIALS_FILE = CREDENTIALS_DIR / "credentials.json"
 TOKEN_FILE = CREDENTIALS_DIR / "token.json"
-OUTPUT_DIR = Path("/tmp/gtm-audit")
+DEFAULT_OUTPUT_DIR = Path("gtm") / "data"  # Relative to cwd (per-project)
 
 
 def get_credentials():
@@ -203,13 +210,23 @@ def interactive_select(items, label, name_key="name", id_key=None):
         print("Invalid choice. Try again.")
 
 
-def save_json(data, filename):
+def save_json(data, filename, output_dir):
     """Save data as pretty-printed JSON."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    filepath = OUTPUT_DIR / filename
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filepath = output_dir / filename
     filepath.write_text(json.dumps(data, indent=2, default=str))
     print(f"  Saved: {filepath}")
     return filepath
+
+
+def resolve_output_dir(cli_value):
+    """Resolve output dir from CLI arg, env var, or default."""
+    if cli_value:
+        return Path(cli_value).resolve()
+    env_value = os.environ.get("GTM_OUTPUT_DIR")
+    if env_value:
+        return Path(env_value).resolve()
+    return (Path.cwd() / DEFAULT_OUTPUT_DIR).resolve()
 
 
 def main():
@@ -219,7 +236,13 @@ def main():
     parser.add_argument("--container-id", help="GTM container ID")
     parser.add_argument("--container-path", help="Full container path")
     parser.add_argument("--workspace-id", help="Workspace ID (default: auto-detect)")
+    parser.add_argument(
+        "--output-dir",
+        help="Directory for JSON output (default: ./gtm/data relative to cwd)",
+    )
     args = parser.parse_args()
+
+    output_dir = resolve_output_dir(args.output_dir)
 
     # Authenticate
     print("Authenticating with Google Tag Manager API...")
@@ -305,12 +328,12 @@ def main():
         folders = []
 
     # Save to JSON files
-    print("\nSaving data...")
-    save_json(tags, "tags.json")
-    save_json(triggers, "triggers.json")
-    save_json(variables, "variables.json")
-    save_json(built_in_vars, "built_in_variables.json")
-    save_json(folders, "folders.json")
+    print(f"\nSaving data to {output_dir}/...")
+    save_json(tags, "tags.json", output_dir)
+    save_json(triggers, "triggers.json", output_dir)
+    save_json(variables, "variables.json", output_dir)
+    save_json(built_in_vars, "built_in_variables.json", output_dir)
+    save_json(folders, "folders.json", output_dir)
 
     metadata = {
         "container_path": container_path,
@@ -324,9 +347,9 @@ def main():
             "folders": len(folders),
         },
     }
-    save_json(metadata, "metadata.json")
+    save_json(metadata, "metadata.json", output_dir)
 
-    print(f"\nDone! All data saved to {OUTPUT_DIR}/")
+    print(f"\nDone! All data saved to {output_dir}/")
     print(f"Total: {len(tags)} tags, {len(triggers)} triggers, {len(variables)} variables")
 
 

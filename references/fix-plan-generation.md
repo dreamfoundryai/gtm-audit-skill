@@ -5,10 +5,13 @@ scored against GTM best practices.
 
 ## Inputs Required
 
-1. **Test results** — `GTM-TAG-TEST-RESULTS.md` (structured pass/fail data)
-2. **Container data** — tags, triggers, variables JSON
-3. **Audit report** — `GTM-AUDIT-REPORT.md` (if available, for cross-referencing)
-4. **Best practices** — `references/google-tag-best-practices.md`
+1. **Test results** — `./gtm/tests/<latest-date>/TEST-RESULTS.md` (structured pass/fail data)
+2. **Container data** — `./gtm/data/*.json` (tags, triggers, variables, etc.)
+3. **Audit report** — `./gtm/audits/<latest-date>/AUDIT-REPORT.md` (if available, for cross-referencing)
+4. **Best practices** — `~/.claude/skills/gtm/references/google-tag-best-practices.md`
+
+Always pick the most recently dated subfolder under `./gtm/tests/` and `./gtm/audits/`
+when looking up prior run data.
 
 ---
 
@@ -263,13 +266,15 @@ scored against GTM best practices.
 
 ## Output Format
 
-Write `GTM-FIX-PLAN.md` with this structure:
+Write `./gtm/fixes/YYYY-MM-DD/FIX-PLAN.md` with this structure
+(create the dated subfolder with `mkdir -p` if it doesn't exist;
+append `-2`, `-3`, etc. if today's folder already exists):
 
 ```markdown
 # GTM Fix Plan — {container_name} ({container_id})
 
 **Created**: {date}
-**Source**: [GTM-TAG-TEST-RESULTS.md](GTM-TAG-TEST-RESULTS.md)
+**Source**: `../../tests/<date>/TEST-RESULTS.md`
 **Container**: {container_id} ({container_name}) — Live version
 **Site**: {site_url}
 

@@ -174,7 +174,9 @@ overall = (tag_coverage * 0.3) + (data_quality * 0.4) + (funnel_score * 0.3)
 
 ## Output Format
 
-Write `GTM-TAG-TEST-RESULTS.md` with this structure:
+Write `./gtm/tests/YYYY-MM-DD/TEST-RESULTS.md` with this structure
+(create the dated subfolder with `mkdir -p` if it doesn't exist;
+append `-2`, `-3`, etc. if today's folder already exists):
 
 ```markdown
 # GTM Tag Testing Report — {container_name} ({container_id})

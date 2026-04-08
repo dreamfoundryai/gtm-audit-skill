@@ -30,6 +30,60 @@ allowed-tools:
 Connects to Google Tag Manager API v2, pulls full container configuration,
 and performs a 53-check audit across 7 categories.
 
+## Project File Structure
+
+**All outputs are written to a `gtm/` folder in the current working directory**
+(the project root). The skill never writes to its own install dir or to `/tmp`.
+
+```
+<project-root>/
+└── gtm/
+    ├── data/                       # Raw GTM API pulls (JSON)
+    │   ├── accounts.json
+    │   ├── containers.json
+    │   ├── tags.json
+    │   ├── triggers.json
+    │   ├── variables.json
+    │   ├── built_in_variables.json
+    │   ├── folders.json
+    │   └── metadata.json           # Container info + fetch timestamp
+    │
+    ├── backups/                    # Container snapshots before fix work
+    │   └── YYYY-MM-DDTHH-MM/
+    │       └── full-container.json
+    │
+    ├── audits/                     # /gtm audit outputs
+    │   └── YYYY-MM-DD/
+    │       ├── AUDIT-REPORT.md
+    │       ├── ACTIVE-TAGS.md
+    │       └── INTERFERENCE-MATRIX.md
+    │
+    ├── tests/                      # /gtm test + /gtm results outputs
+    │   └── YYYY-MM-DD/
+    │       ├── TEST-BRIEF.md       # Single file <=25 active tags, else split:
+    │       ├── TEST-BRIEF-1-google.md
+    │       ├── TEST-BRIEF-2-meta.md
+    │       ├── TEST-BRIEF-3-vendors.md
+    │       └── TEST-RESULTS.md
+    │
+    └── fixes/                      # /gtm fix outputs
+        └── YYYY-MM-DD/
+            └── FIX-PLAN.md
+```
+
+**Conventions:**
+- Root folder is always `gtm/` (visible, not `.gtm/`)
+- Each workflow run gets its own `YYYY-MM-DD` subfolder so re-runs don't clobber history
+- If multiple runs happen on the same day, append `-2`, `-3`, etc. to the date folder
+- Report filenames are SCREAMING-KEBAB (`AUDIT-REPORT.md`) — easy to spot
+- Before writing outputs, the skill creates the target folder via `mkdir -p`
+- The skill reads the most recent run from each subfolder when looking up prior data
+  (e.g., `/gtm fix` reads the newest `tests/*/TEST-RESULTS.md`)
+
+**Per-project isolation:** each project directory has its own independent `gtm/`
+folder. Running the skill in `~/Dev/client-acme` and `~/Dev/client-zhik` keeps
+their data fully separated.
+
 ## Quick Reference
 
 | Command | What it does |
@@ -57,26 +111,31 @@ and performs a 53-check audit across 7 categories.
    c. Create OAuth 2.0 credentials (Desktop app type)
    d. Download `credentials.json` and place at `~/.config/gtm-audit/credentials.json`
    e. Grant the OAuth client or service account email access in GTM (Admin > User Management)
-3. Run `scripts/fetch_gtm.py --auth-only` to complete OAuth flow and cache token
+3. Run `~/.claude/skills/gtm/.venv/bin/python ~/.claude/skills/gtm/scripts/fetch_gtm.py --auth-only` to complete OAuth flow and cache token
 4. Verify connection by listing accessible accounts
 
 ### Full Audit (`/gtm audit`)
 
-1. Run `scripts/fetch_gtm.py` to fetch container data → outputs JSON to `/tmp/gtm-audit/`
+1. Run the fetcher from the project root so output lands in `./gtm/data/`:
+   ```bash
+   ~/.claude/skills/gtm/.venv/bin/python ~/.claude/skills/gtm/scripts/fetch_gtm.py
+   ```
+   Writes JSON to `./gtm/data/` (default). Override with `--output-dir` or `GTM_OUTPUT_DIR` env var.
 2. Read `references/gtm-audit.md` for full 53-check audit checklist
 3. Read `references/scoring-system.md` for weighted scoring
 4. Read `references/google-tag-best-practices.md` for official Google guidance per check
-5. Parse fetched JSON data (tags, triggers, variables, built-in variables)
+5. Parse fetched JSON data from `./gtm/data/` (tags, triggers, variables, built-in variables)
 6. Evaluate all applicable checks as PASS, WARNING, or FAIL — cite Google best practice where relevant
 7. Calculate GTM Health Score (0-100)
-8. Generate `GTM-AUDIT-REPORT.md` with findings, Google doc citations, and action plan
+8. Generate `./gtm/audits/YYYY-MM-DD/AUDIT-REPORT.md` with findings, Google doc citations, and action plan.
+   Also write `ACTIVE-TAGS.md` (tag inventory matrix) and `INTERFERENCE-MATRIX.md` (conflict pairs) into the same folder.
 
 ### On-Page Test Suite (`/gtm test`)
 
 Generates a comprehensive browser testing document from container data. Designed to be
 handed to Claude in Chrome (or any browser-based tester) for live on-page validation.
 
-1. **Load container data** — Read tags, triggers, variables from `/tmp/gtm-audit/` or project `backups/` dir
+1. **Load container data** — Read tags, triggers, variables from `./gtm/data/` (most recent pull)
 2. Read `references/test-generation.md` for tag-type templates and test structure
 3. **Classify every active tag** into test groups:
    - **Always-Fire**: Tags on All Pages / Consent Init / Container Loaded triggers
@@ -93,13 +152,14 @@ handed to Claude in Chrome (or any browser-based tester) for live on-page valida
 7. **Add cross-vendor consistency checks** — Compare values across GA4/Meta/GAds/Bing/etc.
 8. **Add gate rules** — Stop-and-document rules at critical funnel steps
 9. **Generate known issues list** — From audit findings or tag config anomalies
-10. **Output**: Write `GTM-TAG-TEST-BRIEF.md` to project directory
+10. **Output**: Write `./gtm/tests/YYYY-MM-DD/TEST-BRIEF.md`
 
 The test brief is self-contained — a tester (human or Claude in Chrome) can execute it
 without access to the GTM container or API.
 
-**Splitting**: If the container has >25 active tags, split into multiple test suite files
-grouped by vendor/platform (e.g., `TEST-SUITE-1-GOOGLE.md`, `TEST-SUITE-2-META.md`).
+**Splitting**: If the container has >25 active tags, split into multiple files in the
+same folder grouped by vendor/platform (e.g., `TEST-BRIEF-1-google.md`, `TEST-BRIEF-2-meta.md`,
+`TEST-BRIEF-3-vendors.md`).
 
 ### Ingest Test Results (`/gtm results`)
 
@@ -117,17 +177,17 @@ Parses browser test results back into structured findings for fix plan generatio
    - Data quality: X% parameters validated correctly
    - Known issues confirmed: X/Y
    - New issues found: count
-9. **Output**: Write `GTM-TAG-TEST-RESULTS.md` (structured) to project directory
+9. **Output**: Write `./gtm/tests/YYYY-MM-DD/TEST-RESULTS.md` (structured)
 10. **Store parsed data** for fix plan generation — tag failures, parameter issues, behavioral problems
 
 ### Build Fix Plan (`/gtm fix`)
 
 Generates a prioritized remediation plan from test results, scored against GTM best practices.
 
-1. **Load inputs**:
-   - Parsed test results (`GTM-TAG-TEST-RESULTS.md`)
-   - Container data (tags, triggers, variables JSON)
-   - Audit report if available (`GTM-AUDIT-REPORT.md`)
+1. **Load inputs** (always use the most recent run in each folder):
+   - Parsed test results from `./gtm/tests/<latest>/TEST-RESULTS.md`
+   - Container data from `./gtm/data/`
+   - Audit report if available from `./gtm/audits/<latest>/AUDIT-REPORT.md`
 2. Read `references/fix-plan-generation.md` for fix templates and prioritization rules
 3. Read `references/google-tag-best-practices.md` for official Google guidance
 4. **Classify every issue** by:
@@ -144,7 +204,7 @@ Generates a prioritized remediation plan from test results, scored against GTM b
    - Specific steps to implement
    - Google best practice reference (from `references/google-tag-best-practices.md`)
    - Validation criteria (how to confirm the fix works)
-7. **Output**: Write `GTM-FIX-PLAN.md` to project directory
+7. **Output**: Write `./gtm/fixes/YYYY-MM-DD/FIX-PLAN.md`
 
 ### End-to-End Workflow
 
@@ -162,16 +222,20 @@ The workflow is designed for a feedback loop:
 ### Data Flow
 
 ```
-GTM API v2 → fetch_gtm.py → /tmp/gtm-audit/*.json → Analysis → Report
+GTM API v2 → fetch_gtm.py → ./gtm/data/*.json → Analysis → ./gtm/{audits,tests,fixes}/YYYY-MM-DD/*.md
 ```
 
-Files written by fetch script:
-- `/tmp/gtm-audit/accounts.json` — Accessible accounts
-- `/tmp/gtm-audit/containers.json` — Containers in selected account
-- `/tmp/gtm-audit/tags.json` — All tags with full configuration
-- `/tmp/gtm-audit/triggers.json` — All triggers with filters
-- `/tmp/gtm-audit/variables.json` — All variables (custom + built-in)
-- `/tmp/gtm-audit/metadata.json` — Container metadata, fetch timestamp
+Files written by fetch script (relative to project cwd):
+- `./gtm/data/accounts.json` — Accessible accounts
+- `./gtm/data/containers.json` — Containers in selected account
+- `./gtm/data/tags.json` — All tags with full configuration
+- `./gtm/data/triggers.json` — All triggers with filters
+- `./gtm/data/variables.json` — All variables (custom + built-in)
+- `./gtm/data/built_in_variables.json` — Enabled built-in variables
+- `./gtm/data/folders.json` — Container folders
+- `./gtm/data/metadata.json` — Container metadata, fetch timestamp
+
+See **Project File Structure** at the top of this file for the full layout.
 
 ## What to Analyze
 
@@ -279,8 +343,8 @@ Organization:         XX/100  ██████████  (10%)
 ```
 
 ### Deliverables
-- `GTM-AUDIT-REPORT.md` — Full 53-check findings with pass/warning/fail
-- **Interference matrix** — Tag-to-tag conflict pairs with severity and type
+- `./gtm/audits/<date>/AUDIT-REPORT.md` — Full 53-check findings with pass/warning/fail
+- `./gtm/audits/<date>/INTERFERENCE-MATRIX.md` — Tag-to-tag conflict pairs with severity and type
 - Tag inventory matrix (name, type, trigger, consent status, firing option)
 - Vendor grouping analysis (all tags grouped by platform/vendor)
 - Orphaned trigger/variable list

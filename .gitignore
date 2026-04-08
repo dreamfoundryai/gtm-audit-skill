@@ -7,4 +7,12 @@ venv/
 .env
 credentials.json
 token.json
+# Legacy output location (pre-v0.2)
 /tmp/gtm-audit/
+
+# Per-project outputs (if someone clones the skill repo into a project root)
+gtm/data/
+gtm/audits/
+gtm/tests/
+gtm/fixes/
+gtm/backups/
